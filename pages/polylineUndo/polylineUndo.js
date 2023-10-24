@@ -2,11 +2,85 @@ import Stack from './stack';
 import Konva from "konva";
 import { createMachine, interpret } from "xstate";
 
+class UndoManager {
+    constructor(buttonUndo, buttonRedo){
+        this.buttonUndo = buttonUndo
+        this.buttonRedo = buttonRedo
+        this.undoStack = new Stack()
+        this.redoStack = new Stack()
+    }
+    
+    execute(command){
+        this.undoStack.push(command)
+        this.buttonUndo.disabled = this.canUndo()
+        this.buttonRedo.disabled = this.canRedo()
+    }
+
+    canUndo(){
+        if(this.undoStack.isEmpty()){
+            return true
+        }
+        return false
+    }
+
+    canRedo(){
+        if(this.redoStack.isEmpty()){
+            return true
+        }
+        return false
+    }
+
+    undo(){
+        let command = this.undoStack.peek()
+        command.undo()
+        this.redoStack.push(command)
+        this.undoStack.pop()
+        this.buttonUndo.disabled = this.canUndo()
+        this.buttonRedo.disabled = this.canRedo()
+    }
+    
+    
+
+    redo(){
+        let command = this.redoStack.peek()
+        command.redo()
+        this.undoStack.push(command)
+        this.redoStack.pop()
+        this.buttonUndo.disabled = this.canUndo()
+        this.buttonRedo.disabled = this.canRedo()
+    }
+
+    
+}
+class ConcreteCommand {
+    constructor(polyline, dessin){
+        this.polyline = polyline
+        this.dessin = dessin
+    }
+
+    undo(){
+        this.polyline.remove()
+    }
+
+    redo(){
+        this.dessin.add(this.polyline)
+    }
+}
+
 const stage = new Konva.Stage({
     container: "container",
     width: 400,
-    height: 400,
-});
+     height: 400,
+ });
+
+ //Definition des variables pour undo
+let buttonUndo = document.getElementById("undo")
+let buttonRedo = document.getElementById("redo")
+
+let undoManager = new UndoManager(buttonUndo, buttonRedo);
+
+buttonUndo.addEventListener("click", () => { undoManager.undo() })
+buttonRedo.addEventListener("click", () => {undoManager.redo() })
 
 // Une couche pour le dessin
 const dessin = new Konva.Layer();
@@ -120,6 +194,8 @@ const polylineMachine = createMachine(
                 polyline.stroke("black"); // On change la couleur
                 // On sauvegarde la polyline dans la couche de dessin
                 dessin.add(polyline); // On l'ajoute à la couche de dessin
+                let command = new ConcreteCommand(polyline, dessin)
+                undoManager.execute(command)
             },
             addPoint: (context, event) => {
                 const pos = stage.getPointerPosition();
